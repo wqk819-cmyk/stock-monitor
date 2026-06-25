@@ -302,7 +302,7 @@ def run_monitor(trigger_type="常规监控"):
     print(f"\n📄 报告预览：\n{report}")
     
     # 判断是否需要推送（关键价位触发时才推，避免刷屏）
-    should_push = True  # 强制测试邮件
+    should_push = any(r["urgency"] in ["high", "critical"] for r in results)
     
     if should_push:
         print("\n📤 触发关键价位，发送提醒...")

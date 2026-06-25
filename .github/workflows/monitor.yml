@@ -1,0 +1,71 @@
+name: A股监控提醒
+
+on:
+  schedule:
+    # 定时触发（UTC时间，北京时间=UTC+8）
+    # 早上 9:15 北京时间 = UTC 1:15
+    - cron: '15 1 * * 1-5'
+    # 早上 9:30 北京时间 = UTC 1:30
+    - cron: '30 1 * * 1-5'
+    # 早上 9:45 北京时间 = UTC 1:45（确认开盘走势）
+    - cron: '45 1 * * 1-5'
+    # 晚上 22:00 北京时间 = UTC 14:00（美股盘中/收盘前后）
+    - cron: '0 14 * * 1-5'
+  
+  # 允许手动触发
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+    
+    - name: 设置Python环境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: 安装依赖
+      run: pip install requests
+    
+    - name: 判断触发类型并执行
+      env:
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+        TRIGGER_TIME: ${{ github.event.schedule }}
+      run: |
+        echo "触发时间：$TRIGGER_TIME"
+        # 根据cron时间判断触发类型
+        # 15 1 * * 1-5  → 集合竞价后
+        # 30 1 * * 1-5  → 开盘
+        # 45 1 * * 1-5  → 开盘后确认
+        # 0 14 * * 1-5   → 美股收盘检查
+        
+        HOUR=$(date -u +%H)
+        MIN=$(date -u +%M)
+        DOW=$(date -u +%u)  # 1=周一 ... 5=周五
+        
+        echo "UTC时间：$HOUR:$MIN 星期$DOW"
+        
+        # 注入邮箱授权码（从GitHub Secrets读取）
+        sed -i "s/\"password\": \"\"/\"password\": \"$EMAIL_PASSWORD\"/" stock_monitor.py
+        
+        if [ "$HOUR" = "14" ]; then
+          echo "🌙 执行美股收盘检查..."
+          python3 stock_monitor.py us
+        else
+          echo "📊 执行A股监控..."
+          # 根据分钟判断触发类型
+          if [ "$MIN" = "15" ]; then
+            python3 stock_monitor.py monitor
+          elif [ "$MIN" = "30" ]; then
+            python3 stock_monitor.py monitor
+          elif [ "$MIN" = "45" ]; then
+            python3 stock_monitor.py monitor
+          else
+            python3 stock_monitor.py auto
+          fi
+        fi

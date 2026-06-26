@@ -302,15 +302,19 @@ def run_monitor(trigger_type="常规监控"):
     print(f"\n📄 报告预览：\n{report}")
     
     # 判断是否需要推送（关键价位触发时才推，避免刷屏）
-    should_push = any(r["urgency"] in ["high", "critical"] for r in results)
+        # 每次运行都推送邮件
+    is_urgent = any(r["urgency"] in ["high", "critical"] for r in results)
     
-    if should_push:
-        print("\n📤 触发关键价位，发送提醒...")
-        subject = f"【A股提醒】{results[0]['name']} {results[0]['action']}"
-        send_email(subject, report)
-        send_wechat(report)
+    if is_urgent:
+        print("\n📤 触发关键价位，发送紧急提醒...")
+        subject = f"🚨【A股提醒】{results[0]['name']} {results[0]['action']}"
     else:
-        print("\n💤 未触发关键价位，仅记录不推送（可在GitHub Actions日志查看）")
+        print("\n📧 发送常规监控邮件...")
+        subject = f"📊【A股监控】{results[0]['name']} 现价{results[0]['price']:.3f}"
+    
+    send_email(subject, report)
+    send_wechat(report)
+
         # 如果是GitHub Actions运行，日志就是最好的记录
 
 
